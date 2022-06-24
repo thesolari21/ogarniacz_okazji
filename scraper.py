@@ -92,10 +92,10 @@ def get_only_new_articles(articles):
     Add data to table with search results
     Compare data with all offers and search results
     Add new data to list
-    :param articles: Dict[str, str]
+    :param articles: List[Dict]
     :return: List
     """
-    new_articles = []
+    list_new_articles = []
     conn = sqlite3.connect('./cars.sqlite')
     c = conn.cursor()
 
@@ -122,17 +122,18 @@ def get_only_new_articles(articles):
     on sr.id = o.id
     where o.id is NULL
     """):
-        new_articles.append(row)
+        dict_new_article = dict(zip(["id", "title", "location", "year","distance","capacity","fuel","price","link"],row))
+        list_new_articles.append(dict_new_article)
 
     c.executemany(
         """INSERT INTO offers 
         (id, title, location, year, distance, capacity, fuel, price, link)
         VALUES
-        (?,?,?,?,?,?,?,?,?)
-        """, new_articles
+        (:id,:title,:location,:year,:distance,:capacity,:fuel,:price,:link)
+        """, list_new_articles
     )
 
-    print('Baza uzupelniona o nowe oferty', len(new_articles))
+    print('Baza uzupelniona o nowe oferty', len(list_new_articles))
 
     c.execute(
         """DELETE from search_results"""
@@ -141,7 +142,7 @@ def get_only_new_articles(articles):
     conn.commit()
     conn.close()
 
-    return new_articles
+    return list_new_articles
 
 
 def send_mail(new_offers):
@@ -161,14 +162,14 @@ def send_mail(new_offers):
     item = ""
 
     for offer in new_offers:
-        title = str(offer[1])
-        localization = str(offer[2])
-        year = str(offer[3])
-        distance = str(offer[4])
-        capacity = str(offer[5])
-        fuel = str(offer[6])
-        price = str(offer[7])
-        link = str(offer[8])
+        title = str(offer["title"])
+        localization = str(offer["location"])
+        year = str(offer["year"])
+        distance = str(offer["distance"])
+        capacity = str(offer["capacity"])
+        fuel = str(offer["fuel"])
+        price = str(offer["price"])
+        link = str(offer["link"])
 
         item = item + """
 {:20s}{:40s}
@@ -184,10 +185,10 @@ def send_mail(new_offers):
            'Paliwo:', fuel, 'Cena:', price, 'Link:', link)
 
     message_text = header + item
-    subject = 'elo'
+    subject = 'Nowe oferty'
     message = 'Subject: {}\n\n{}'.format(subject, message_text)
 
-    smtp.sendmail('mailer.bartek3@interia.pl', 'bartsol21@gmail.com', message.encode('utf-8'))
+    smtp.sendmail(config.LOGIN, config.RECIPIENT, message.encode('utf-8'))
     smtp.quit()
     print('Mail z nowymi ofertami wysłany')
 
