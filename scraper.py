@@ -1,9 +1,8 @@
-import requests
 from bs4 import BeautifulSoup
 import sqlite3
-import smtplib
+import requests
+import json
 import config
-
 
 def get_pages(base_url):
     """
@@ -16,12 +15,13 @@ def get_pages(base_url):
     r = requests.get(base_url)
     soup = BeautifulSoup(r.text, 'lxml')
     pagination = soup.find_all("a", class_="ooa-g4wbjr")
+
     last_page = pagination[-1].text if pagination else 1
     print(f'Liczba stron z wynikami wyszukiwania: {last_page}')
 
     pages = []
     for page in list(range(1, int(last_page)+1)):
-        pages.append(base_url + '?page=' + str(page))
+        pages.append(base_url + '&page=' + str(page))
 
     return pages
 
@@ -147,17 +147,12 @@ def get_only_new_articles(articles):
 
 def send_mail(new_offers):
     """
-    Send mail with new offers
-    :param new_offers:
-    :return:
+    Send mail with new offers via API
+    :param new_offers: Dict[str, str]
+    :return: None
     """
-    smtp = smtplib.SMTP(config.SMTP_SERVER, config.PORT)
-    smtp.starttls()
-    smtp.login(config.LOGIN, config.PASSWORD)
 
-    header = """
-    Dzień dobry, nowe oferty:
-    """
+    header = "Dzień dobry, nowe oferty:\n"
 
     item = ""
 
@@ -171,30 +166,33 @@ def send_mail(new_offers):
         price = str(offer["price"])
         link = str(offer["link"])
 
-        item = item + """
-{:20s}{:40s}
-{:20s}{:40s}
-{:20s}{:40s}
-{:20s}{:40s}
-{:20s}{:40s}
-{:20s}{:40s}
-{:20s}{:40s}
-{:20s}{:40s}
-
-""".format('Nazwa:', title, 'Miejsce:', localization, 'Rok:', year, 'Przebieg:', distance, 'Pojemność:', capacity,
+        item = item + '{:20s}{:40s}\n{:20s}{:40s}\n{:20s}{:40s}\n' \
+                      '{:20s}{:40s}\n{:20s}{:40s}\n{:20s}{:40s}\n' \
+                      '{:20s}{:40s}\n{:20s}{:40s}\n\n'\
+            .format('Nazwa:', title, 'Miejsce:', localization, 'Rok:', year, 'Przebieg:', distance, 'Pojemność:', capacity,
            'Paliwo:', fuel, 'Cena:', price, 'Link:', link)
 
     message_text = header + item
     subject = 'Nowe oferty'
-    message = 'Subject: {}\n\n{}'.format(subject, message_text)
 
-    smtp.sendmail(config.LOGIN, config.RECIPIENT, message.encode('utf-8'))
-    smtp.quit()
-    print('Mail z nowymi ofertami wysłany')
-
+    payload = {
+        "api_key": config.API_KEY,
+        "to": [
+            config.RECIPIENT
+        ],
+        "sender": config.SENDER,
+        "subject": subject,
+        "text_body": message_text
+    }
+    headers = {"Content-Type": "application/json"}
+    res = requests.post(config.API_ADDRESS, headers=headers, data=json.dumps(payload))
+    if res.status_code == requests.codes.ok:
+        print('Mail z nowymi ofertami wysłany. Code:' , res.status_code)
+    else:
+        print('Cos poszło nie tak z wysyłką... Code:' , res.status_code)
 
 if __name__ == "__main__":
-    base_url = 'https://www.otomoto.pl/osobowe/bentley'
+    base_url = config.URL
     urls = get_pages(base_url)
     articles = get_articles(urls)
     new_offers = get_only_new_articles(articles)
