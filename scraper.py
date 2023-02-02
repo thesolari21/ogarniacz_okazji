@@ -1,27 +1,46 @@
 from bs4 import BeautifulSoup
 import sqlite3
 import requests
-import json
-import config
+import html_template as ht
+import sys
+
 
 def get_pages(base_url):
     """
     Get number of search pages.
-    Next create target links [1,...,n] and return in list
+    Create target links [1,...,n] and return in list
     :param base_url: str
     :return: List[str]
     """
 
-    r = requests.get(base_url)
-    soup = BeautifulSoup(r.text, 'lxml')
-    pagination = soup.find_all("a", class_="ooa-g4wbjr")
+    headers = {"Content-Type": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36 OPR/94.0.0.0"}
 
-    last_page = pagination[-1].text if pagination else 1
+    r = requests.get(base_url, headers=headers)
+    soup = BeautifulSoup(r.text, 'lxml')
+    pagination = soup.find("ul", attrs={'data-testid': 'pagination-list'})
+
+    char = ''
+
+    # if is only one page with offers - web doesn't show pagination (None)
+    if pagination:
+        pagination = pagination.find_all('a', href=True)
+        last_page = pagination[-1].text
+
+        # depending on the search criteria, the page= parameter is combined with '&' or '?'
+        if '&' in pagination[-1]['href']:
+            char = '&'
+        else:
+            char = '?'
+    else:
+        last_page = str(1)
+
     print(f'Liczba stron z wynikami wyszukiwania: {last_page}')
 
     pages = []
     for page in list(range(1, int(last_page)+1)):
-        pages.append(base_url + '&page=' + str(page))
+        pages.append(base_url + char + 'page=' + str(page))
+
+    print(pages)
 
     return pages
 
@@ -39,20 +58,27 @@ def get_articles(urls):
     for url in urls:
         r = requests.get(url)
         soup = BeautifulSoup(r.text, 'lxml')
-        offers = soup.find_all("article", class_="e1b25f6f18")
+        offers = soup.find_all("article", attrs={"data-variant":"regular"})
 
         for offer in offers:
-            title = offer.find("h2", class_="e1b25f6f13")
+            title = offer.find("h2")
             link = title.find("a")
-            descr_offer = offer.find("ul", class_="e1b25f6f7")
+            descr_offer = offer.find("ul")
             desc_list = descr_offer.find_all("li")
-            year = desc_list[0] if desc_list else 'N/D'
-            distance = desc_list[1] if desc_list else 'N/D'
-            capacity = desc_list[2] if desc_list else 'N/D'
-            fuel = desc_list[3] if desc_list else 'N/D'
-            location = offer.find("svg")
-            location = location.next_sibling
-            price = offer.find("span", class_="ooa-epvm6")
+
+            # in case one of the parameters is missing
+            try:
+                year = desc_list[0]
+                distance = desc_list[1]
+                capacity = desc_list[2]
+                fuel = desc_list[3]
+            except:
+                year = distance = capacity = fuel = title
+
+            location = offer.find("span", class_ = "ooa-fzu03x")
+            price = offer.find("span", class_ = "ooa-1bmnxg7 e1p19lg711")
+            foto = offer.find("img")
+
 
             title = title.text
             title = title[:29]
@@ -63,9 +89,16 @@ def get_articles(urls):
             capacity = capacity.text
             fuel = fuel.text
             price = price.text
+            location = location.text
+
+            try:
+                foto = foto["src"]
+            except TypeError:
+                foto = 'https://static.vecteezy.com/system/resources/previews/005/576/332/original/car-icon-car-icon-car-icon-simple-sign-free-vector.jpg'
 
             distance = distance[:-2].replace(" ", "")
             capacity = capacity[:-3].replace(" ", "")
+            location = location.split(' ')[0]
             price = price[:-3].replace(" ", "")
 
             single_split_offer = {
@@ -77,10 +110,12 @@ def get_articles(urls):
                 "capacity": capacity,
                 "fuel": fuel,
                 "price": price,
-                "location": location
+                "location": location,
+                "foto": foto
             }
 
             list_of_articles.append(single_split_offer)
+
     print(f'Pobranych ofert: {len(list_of_articles)}')
 
     return list_of_articles
@@ -88,32 +123,33 @@ def get_articles(urls):
 
 def get_only_new_articles(articles):
     """
-    Create tables with all offers and search results if not exists
+    Create tables with all offers and search results -> if not exists
     Add data to table with search results
     Compare data with all offers and search results
-    Add new data to list
+    Add new data to Dict
     :param articles: List[Dict]
-    :return: List
+    :return: Dict
     """
+
     list_new_articles = []
     conn = sqlite3.connect('./cars.sqlite')
     c = conn.cursor()
 
     c.execute("""
     CREATE TABLE if not exists offers
-    ( id TEXT, title TEXT, location TEXT, year INTEGER, distance INTEGER, capacity INTEGER, fuel TEXT, price INTEGER, link TEXT)
+    ( id TEXT, title TEXT, location TEXT, year INTEGER, distance INTEGER, capacity INTEGER, fuel TEXT, price INTEGER, link TEXT, foto TEXT)
     """)
 
     c.execute("""
     CREATE TABLE if not exists search_results
-    ( id TEXT, title TEXT, location TEXT, year INTEGER, distance INTEGER, capacity INTEGER, fuel TEXT, price INTEGER, link TEXT)
+    ( id TEXT, title TEXT, location TEXT, year INTEGER, distance INTEGER, capacity INTEGER, fuel TEXT, price INTEGER, link TEXT, foto TEXT)
     """)
 
     c.executemany("""
     INSERT INTO search_results 
-    (id, title, location, year, distance, capacity, fuel, price, link)
+    (id, title, location, year, distance, capacity, fuel, price, link, foto)
     VALUES
-    (:id,:title,:location,:year,:distance,:capacity,:fuel,:price,:link)
+    (:id,:title,:location,:year,:distance,:capacity,:fuel,:price,:link,:foto)
     """, articles)
 
     for row in c.execute("""
@@ -122,14 +158,14 @@ def get_only_new_articles(articles):
     on sr.id = o.id
     where o.id is NULL
     """):
-        dict_new_article = dict(zip(["id", "title", "location", "year","distance","capacity","fuel","price","link"],row))
+        dict_new_article = dict(zip(["id", "title", "location", "year","distance","capacity","fuel","price","link","foto"],row))
         list_new_articles.append(dict_new_article)
 
     c.executemany(
         """INSERT INTO offers 
-        (id, title, location, year, distance, capacity, fuel, price, link)
+        (id, title, location, year, distance, capacity, fuel, price, link, foto)
         VALUES
-        (:id,:title,:location,:year,:distance,:capacity,:fuel,:price,:link)
+        (:id,:title,:location,:year,:distance,:capacity,:fuel,:price,:link,:foto)
         """, list_new_articles
     )
 
@@ -145,55 +181,9 @@ def get_only_new_articles(articles):
     return list_new_articles
 
 
-def send_mail(new_offers):
-    """
-    Send mail with new offers via API
-    :param new_offers: Dict[str, str]
-    :return: None
-    """
-
-    header = "Dzień dobry, nowe oferty:\n"
-
-    item = ""
-
-    for offer in new_offers:
-        title = str(offer["title"])
-        localization = str(offer["location"])
-        year = str(offer["year"])
-        distance = str(offer["distance"])
-        capacity = str(offer["capacity"])
-        fuel = str(offer["fuel"])
-        price = str(offer["price"])
-        link = str(offer["link"])
-
-        item = item + '{:20s}{:40s}\n{:20s}{:40s}\n{:20s}{:40s}\n' \
-                      '{:20s}{:40s}\n{:20s}{:40s}\n{:20s}{:40s}\n' \
-                      '{:20s}{:40s}\n{:20s}{:40s}\n\n'\
-            .format('Nazwa:', title, 'Miejsce:', localization, 'Rok:', year, 'Przebieg:', distance, 'Pojemność:', capacity,
-           'Paliwo:', fuel, 'Cena:', price, 'Link:', link)
-
-    message_text = header + item
-    subject = 'Nowe oferty'
-
-    payload = {
-        "api_key": config.API_KEY,
-        "to": [
-            config.RECIPIENT
-        ],
-        "sender": config.SENDER,
-        "subject": subject,
-        "text_body": message_text
-    }
-    headers = {"Content-Type": "application/json"}
-    res = requests.post(config.API_ADDRESS, headers=headers, data=json.dumps(payload))
-    if res.status_code == requests.codes.ok:
-        print('Mail z nowymi ofertami wysłany. Code:' , res.status_code)
-    else:
-        print('Cos poszło nie tak z wysyłką... Code:' , res.status_code)
-
 if __name__ == "__main__":
-    base_url = config.URL
-    urls = get_pages(base_url)
-    articles = get_articles(urls)
+    pages = get_pages(sys.argv[1])
+    articles = get_articles(pages)
     new_offers = get_only_new_articles(articles)
-    send_mail(new_offers)
+    ht.prepare_mail(new_offers)
+    print('Gotowe')
