@@ -76,7 +76,8 @@ def get_articles(urls):
                 year = distance = capacity = fuel = title
 
             location = offer.find("span", class_ = "ooa-fzu03x")
-            price = offer.find("span", class_ = "ooa-1bmnxg7 e1p19lg711")
+            price = offer.find("span", class_ = "ooa-1bmnxg7 eayvfn611")
+
             foto = offer.find("img")
 
 
