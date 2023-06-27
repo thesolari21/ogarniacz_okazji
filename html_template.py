@@ -1,4 +1,4 @@
-import smtplib, ssl, logging
+import smtplib, ssl, logging, datetime
 from email.message import EmailMessage
 
 def prepare_mail(new_offers):
@@ -333,6 +333,8 @@ ul.sidebar li a h1,ul.sidebar li a h2,ul.sidebar li a h3,ul.sidebar li a h4,ul.s
 </html>
     """
 
+    now = datetime.datetime.now()
+    date_string = now.strftime("%m-%d-%H-%M")
     content = head + body
 
     try:
@@ -343,7 +345,7 @@ ul.sidebar li a h1,ul.sidebar li a h2,ul.sidebar li a h3,ul.sidebar li a h4,ul.s
         password = ""
 
         msg = EmailMessage()
-        msg['Subject'] = 'Nowe oferty!'
+        msg['Subject'] = 'Nowe oferty! ' + date_string
         msg['From'] = sender_email
         msg['To'] = receiver_email
         msg.set_content(content, subtype='html')

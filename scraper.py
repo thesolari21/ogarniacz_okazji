@@ -68,31 +68,26 @@ def get_articles(urls):
 
             # in case one of the parameters is missing
             try:
-                year = desc_list[0]
-                distance = desc_list[1]
-                capacity = desc_list[2]
-                fuel = desc_list[3]
+                year = desc_list[0].text
+                distance = desc_list[1].text
+                capacity = desc_list[2].text
+                fuel = desc_list[3].text
             except:
-                year = distance = capacity = fuel = title
+                year = distance = capacity = fuel = "N/D"
 
-            location = offer.find("span", class_ = "ooa-fzu03x")
-            price = offer.find("span", class_ = "ooa-1bmnxg7 eayvfn611")
-
-            foto = offer.find("img")
-
+            try:
+                location = offer.find("span", class_ = "ooa-fzu03x").text
+                price = offer.find("span", class_ = "ooa-1bmnxg7 evg565y13").text
+            except:
+                location = price = "N/D"
 
             title = title.text
             title = title[:29]
             id = link["href"][-13:-5]
             link = link["href"]
-            year = year.text
-            distance = distance.text
-            capacity = capacity.text
-            fuel = fuel.text
-            price = price.text
-            location = location.text
 
             try:
+                foto = offer.find("img")
                 foto = foto["src"]
             except TypeError:
                 foto = 'https://static.vecteezy.com/system/resources/previews/005/576/332/original/car-icon-car-icon-car-icon-simple-sign-free-vector.jpg'
