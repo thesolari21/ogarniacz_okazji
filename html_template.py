@@ -1,5 +1,6 @@
 import smtplib, ssl, logging, datetime
 from email.message import EmailMessage
+import json
 
 def prepare_mail(new_offers):
 
@@ -334,15 +335,18 @@ ul.sidebar li a h1,ul.sidebar li a h2,ul.sidebar li a h3,ul.sidebar li a h4,ul.s
     """
 
     now = datetime.datetime.now()
-    date_string = now.strftime("%m-%d-%H-%M")
+    date_string = now.strftime("%d-%m")
     content = head + body
 
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+
     try:
-        port = 465  # For SSL
-        smtp_server = ""
-        sender_email = ""
-        receiver_email = [""]
-        password = ""
+        port = config['port']  # For SSL
+        smtp_server = config['smtp_server']
+        sender_email = config['sender_email']
+        receiver_email = config['receiver_email']
+        password = config['password']
 
         msg = EmailMessage()
         msg['Subject'] = 'Nowe oferty! ' + date_string

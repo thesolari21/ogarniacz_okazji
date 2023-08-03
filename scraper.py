@@ -77,7 +77,7 @@ def get_articles(urls):
 
             try:
                 location = offer.find("span", class_ = "ooa-fzu03x").text
-                price = offer.find("span", class_ = "ooa-1bmnxg7 evg565y13").text
+                price = offer.find("span", class_ = "ooa-1bmnxg7 evg565y14").text
             except:
                 location = price = "N/D"
 
