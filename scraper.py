@@ -58,10 +58,10 @@ def get_articles(urls):
     for url in urls:
         r = requests.get(url)
         soup = BeautifulSoup(r.text, 'lxml')
-        offers = soup.find_all("article", attrs={"data-variant":"regular"})
+        offers = soup.find_all("article", attrs={"data-media-size":"small"})
 
         for offer in offers:
-            title = offer.find("h2")
+            title = offer.find("h1")
             link = title.find("a")
             descr_offer = offer.find("ul")
             desc_list = descr_offer.find_all("li")
