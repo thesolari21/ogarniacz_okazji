@@ -45,6 +45,7 @@ def get_pages(base_url):
     return pages
 
 
+
 def get_articles(urls):
     """
     Get list with URLs
@@ -61,30 +62,21 @@ def get_articles(urls):
         offers = soup.find_all("article", attrs={"data-media-size":"small"})
 
         for offer in offers:
-            title = offer.find("h1")
-            link = title.find("a")
-            descr_offer = offer.find("ul")
-            desc_list = descr_offer.find_all("li")
-
-            # in case one of the parameters is missing
-            try:
-                year = desc_list[0].text
-                distance = desc_list[1].text
-                capacity = desc_list[2].text
-                fuel = desc_list[3].text
-            except:
-                year = distance = capacity = fuel = "N/D"
 
             try:
-                location = offer.find("span", class_ = "ooa-fzu03x").text
-                price = offer.find("span", class_ = "ooa-1bmnxg7 evg565y14").text
-            except:
-                location = price = "N/D"
+                title = offer.find("h1").text[:29]
+                link = offer.find("a")["href"]
+                id = link[-13:-5]
 
-            title = title.text
-            title = title[:29]
-            id = link["href"][-13:-5]
-            link = link["href"]
+                year = offer.find("dd", attrs={"data-parameter":"year"}).text
+                distance = offer.find("dd", attrs={"data-parameter":"mileage"}).text[:-2].replace(" ", "")
+                capacity = offer.find("dd", attrs={"data-parameter":"mileage"}).text[:-3].replace(" ", "")
+                fuel = offer.find("dd", attrs={"data-parameter":"fuel_type"}).text
+
+                location = offer.find("p", class_ = "ooa-gmxnzj").text.split(' ')[0]
+                price = offer.find("h3").text
+            except:
+                title = link = id = year = distance = capacity = fuel = location = price = "N/D"
 
             try:
                 foto = offer.find("img")
@@ -92,10 +84,6 @@ def get_articles(urls):
             except TypeError:
                 foto = 'https://static.vecteezy.com/system/resources/previews/005/576/332/original/car-icon-car-icon-car-icon-simple-sign-free-vector.jpg'
 
-            distance = distance[:-2].replace(" ", "")
-            capacity = capacity[:-3].replace(" ", "")
-            location = location.split(' ')[0]
-            price = price[:-3].replace(" ", "")
 
             single_split_offer = {
                 "title": title,
